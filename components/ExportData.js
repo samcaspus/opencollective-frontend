@@ -86,8 +86,11 @@ class ExportData extends React.Component {
               defaultMessage="All contributors: {link}"
               values={{
                 link: (
-                  <StyledLink display="block" href={`/${collective.slug}/members/all.json`}>
-                    https://opencollective.com/
+                  <StyledLink
+                    display="block"
+                    href={`https://rest.opencollective.com/${collective.slug}/members/all.json`}
+                  >
+                    https://rest.opencollective.com/
                     {collective.slug}
                     /members/all.json
                   </StyledLink>
@@ -101,8 +104,11 @@ class ExportData extends React.Component {
               defaultMessage="Only individuals: {link}"
               values={{
                 link: (
-                  <StyledLink display="block" href={`/${collective.slug}/members/users.json`}>
-                    https://opencollective.com/
+                  <StyledLink
+                    display="block"
+                    href={`https://rest.opencollective.com/${collective.slug}/members/users.json`}
+                  >
+                    https://rest.opencollective.com/
                     {collective.slug}
                     /members/users.json
                   </StyledLink>
@@ -116,8 +122,11 @@ class ExportData extends React.Component {
               defaultMessage="Only organizations: {link}"
               values={{
                 link: (
-                  <StyledLink display="block" href={`/${collective.slug}/members/organizations.json`}>
-                    https://opencollective.com/
+                  <StyledLink
+                    display="block"
+                    href={`https://rest.opencollective.com/${collective.slug}/members/organizations.json`}
+                  >
+                    https://rest.opencollective.com/
                     {collective.slug}
                     /members/organizations.json
                   </StyledLink>
