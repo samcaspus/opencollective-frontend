@@ -273,7 +273,8 @@ export default class RichTextEditor extends React.Component {
       const url = match[1];
       if (isURL(url)) {
         const position = match.index;
-        const range = [position, position + url.length];
+        const urlLength = this.autolinkDelimiter(url);
+        const range = [position, position + urlLength];
         const hrefAtRange = editor.getDocument().getCommonAttributesAtRange(range).href;
         if (hrefAtRange !== url) {
           this.updateInRange(editor, range, 0, () => {
@@ -285,6 +286,61 @@ export default class RichTextEditor extends React.Component {
       }
     }
   }
+
+  /** A helper used by autolink to find where the url actually ends
+   * Credits:
+   * https://github.com/github/cmark-gfm/blob/36c1553d2a1f04dc1628e76b18490edeff78b8d0/extensions/autolink.c#L37
+   * https://github.com/vmg/redcarpet/blob/92a7b3ae2241b862e9bf45e0af3cf53ebdfb0afb/ext/redcarpet/autolink.c#L58
+   */
+  autolinkDelimiter = url => {
+    let linkEnd = url.length;
+
+    while (linkEnd > 0) {
+      const cclose = url[linkEnd - 1];
+
+      let copen;
+      switch (cclose) {
+        case '"':
+          copen = '"';
+          break;
+        case "'":
+          copen = "'";
+          break;
+        case ')':
+          copen = '(';
+          break;
+        case ']':
+          copen = '[';
+          break;
+        case '}':
+          copen = '{';
+          break;
+      }
+
+      if ('?!.,:;*_~\'"'.includes(url[linkEnd - 1])) {
+        linkEnd--;
+      } else if (copen) {
+        let unclosed = 0;
+
+        for (let i = 0; i < linkEnd; i++) {
+          if (url[i] === copen) {
+            unclosed++;
+          } else if (url[i] === cclose) {
+            unclosed--;
+          }
+        }
+
+        if (unclosed >= 0) {
+          break;
+        }
+        linkEnd--;
+      } else {
+        break;
+      }
+    }
+
+    return linkEnd;
+  };
 
   /** A trix helper that will apply func in range then restore base range when it's done */
   updateInRange(editor, range, offset = 0, updateFunc) {
