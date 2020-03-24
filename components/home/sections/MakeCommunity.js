@@ -1,6 +1,5 @@
 import React, { useState, Fragment } from 'react';
 import styled from 'styled-components';
-import themeGet from '@styled-system/theme-get';
 import { FormattedMessage } from 'react-intl';
 import { Flex, Box } from '@rebass/grid';
 import { RightArrow } from '@styled-icons/boxicons-regular/RightArrow';
@@ -32,26 +31,6 @@ const SustainTextWrapper = styled(Span)`
 
 const WatchVideoButtons = styled(StyledButton)`
   padding: 15px 20px;
-  color: ${themeGet('colors.black.700')};
-  border-color: ${themeGet('colors.black.400')};
-  &:hover {
-    color: ${themeGet('colors.black.700')};
-    border-color: ${themeGet('colors.blue.300')};
-
-    .arrowIcon {
-      color: ${themeGet('colors.blue.300')};
-    }
-  }
-
-  &:focus {
-    color: ${themeGet('colors.white.full')};
-    border-color: ${themeGet('colors.white.full')};
-    background: #434566;
-
-    .arrowIcon {
-      color: ${themeGet('colors.white.full')};
-    }
-  }
 `;
 
 const MakeCommunity = () => {
