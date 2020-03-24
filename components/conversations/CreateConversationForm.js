@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useReducer, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { FormattedMessage, defineMessages, useIntl } from 'react-intl';
-import { useForm } from 'react-hook-form';
 import { Flex, Box } from '@rebass/grid';
 import { useMutation } from '@apollo/react-hooks';
 
@@ -43,6 +42,39 @@ const messages = defineMessages({
   },
 });
 
+const initialFormState = {
+  html: '',
+  tags: [],
+  title: '',
+  errors: {},
+  isSubmitting: false,
+};
+
+const reducer = (state, { field, value }) => {
+  return {
+    ...state,
+    [field]: value,
+  };
+};
+
+const validate = state => {
+  const { title, html } = state;
+  const errors = {};
+  if (!title) {
+    errors.title = { type: 'required' };
+  } else if (title.length < 3) {
+    errors.title = { type: 'minLength' };
+  } else if (title.length > 255) {
+    errors.title = { type: 'maxLength' };
+  }
+
+  if (!html) {
+    errors.html = { type: 'required' };
+  }
+
+  return errors;
+};
+
 /**
  * Form to create a new conversation. User must be authenticated.
  *
@@ -51,21 +83,30 @@ const messages = defineMessages({
 const CreateConversationForm = ({ collectiveId, suggestedTags, onSuccess, disabled, loading }) => {
   const { formatMessage } = useIntl();
   const [createConversation, { error: submitError }] = useMutation(CreateConversationMutation, mutationOptions);
-  const { register, handleSubmit, errors, formState, setValue } = useForm();
+  const [state, dispatch] = useReducer(reducer, initialFormState);
+  const { title, html, tags, errors, isSubmitting } = state;
 
-  // Manually register custom fields
-  React.useEffect(() => {
-    register('html', { required: true });
-    register('tags');
-  }, []);
+  useEffect(() => {
+    if (Object.keys(errors).length === 0 && isSubmitting) {
+      submitForm(title, html, tags);
+    }
+  }, [errors]);
+
+  const validateSubmit = event => {
+    event.preventDefault();
+    dispatch({ field: 'errors', value: validate(state) });
+    dispatch({ field: 'isSubmitting', value: true });
+  };
+
+  const submitForm = async (titleField, htmlField, tagsField) => {
+    const response = await createConversation({
+      variables: { title: titleField, html: htmlField, tags: tagsField, CollectiveId: collectiveId },
+    });
+    return onSuccess(response.data.createConversation);
+  };
 
   return (
-    <form
-      onSubmit={handleSubmit(async values => {
-        const response = await createConversation({ variables: { ...values, CollectiveId: collectiveId } });
-        return onSuccess(response.data.createConversation);
-      })}
-    >
+    <form onSubmit={validateSubmit}>
       <Flex flexWrap="wrap">
         <Box flex={['1 1 100%', null, null, '1 1']}>
           {loading ? (
@@ -84,7 +125,8 @@ const CreateConversationForm = ({ collectiveId, suggestedTags, onSuccess, disabl
               px={0}
               py={0}
               placeholder={formatMessage(messages.titlePlaceholder)}
-              ref={register({ required: true, minLength: 3, maxLength: 255 })}
+              value={title}
+              onChange={e => dispatch({ field: 'title', value: e.target.value })}
             />
           )}
           {errors.title && (
@@ -92,11 +134,18 @@ const CreateConversationForm = ({ collectiveId, suggestedTags, onSuccess, disabl
               {errors.title.type === 'required' && (
                 <FormattedMessage id="Error.FieldRequired" defaultMessage="This field is required" />
               )}
+              {errors.title.type === 'minLength' && (
+                <FormattedMessage
+                  id="Error.MinLength"
+                  defaultMessage="Length must be more than {length}"
+                  values={{ length: 2 }}
+                />
+              )}
               {errors.title.type === 'maxLength' && (
                 <FormattedMessage
                   id="Error.MaxLength"
                   defaultMessage="Length must be less than {length}"
-                  values={{ length: 255 }}
+                  values={{ length: 256 }}
                 />
               )}
             </P>
@@ -112,7 +161,7 @@ const CreateConversationForm = ({ collectiveId, suggestedTags, onSuccess, disabl
                 editorMinHeight={225}
                 inputName="html"
                 fontSize="13px"
-                onChange={e => setValue('html', e.target.value)}
+                onChange={e => dispatch({ field: 'html', value: e.target.value })}
                 error={errors.title}
               />
             )}
@@ -136,7 +185,10 @@ const CreateConversationForm = ({ collectiveId, suggestedTags, onSuccess, disabl
                   maxWidth={300}
                   suggestedTags={suggestedTags}
                   onChange={options =>
-                    setValue('tags', options && options.length > 0 ? options.map(option => option.value) : null)
+                    dispatch({
+                      field: 'tags',
+                      value: options && options.length > 0 ? options.map(option => option.value) : null,
+                    })
                   }
                 />
               )}
@@ -160,7 +212,6 @@ const CreateConversationForm = ({ collectiveId, suggestedTags, onSuccess, disabl
         buttonStyle="primary"
         data-cy="submit-new-conversation-btn"
         disabled={disabled || loading}
-        loading={formState.isSubmitting}
         minWidth={200}
         mt={3}
       >

@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useReducer, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { defineMessages, useIntl } from 'react-intl';
+import { FormattedMessage, defineMessages, useIntl } from 'react-intl';
 import { withRouter } from 'next/router';
 import { get } from 'lodash';
-import { useForm } from 'react-hook-form';
 import { useMutation } from '@apollo/react-hooks';
 
 import { gqlV2, API_V2_CONTEXT } from '../../lib/graphql/helpers';
@@ -16,6 +15,7 @@ import SignInOrJoinFree from '../SignInOrJoinFree';
 import Container from '../Container';
 import ContainerOverlay from '../ContainerOverlay';
 import MessageBox from '../MessageBox';
+import { P } from '../Text';
 import { CommentFieldsFragment } from './graphql';
 
 const createCommentMutation = gqlV2`
@@ -69,6 +69,28 @@ const prepareCommentParams = (values, conversationId, expenseId) => {
   return comment;
 };
 
+const initialFormState = {
+  html: '',
+  validationErrors: {},
+  isSubmitting: false,
+};
+
+const reducer = (state, { field, value }) => {
+  return {
+    ...state,
+    [field]: value,
+  };
+};
+
+const validate = state => {
+  const { html } = state;
+  const validationErrors = {};
+  if (!html) {
+    validationErrors.html = { type: 'required' };
+  }
+  return validationErrors;
+};
+
 /**
  * Form for users to post comments on either expenses, conversations or updates.
  * If user is not logged in, the form will default to a sign in/up form.
@@ -83,18 +105,25 @@ const CommentForm = ({
   LoggedInUser,
   isDisabled,
 }) => {
-  const [createComment, { error, data }] = useMutation(createCommentMutation, mutationOptions);
-  const { register, triggerValidation, setValue, formState, handleSubmit } = useForm({ mode: 'onChange' });
+  const [createComment, { mutationError, data }] = useMutation(createCommentMutation, mutationOptions);
   const { formatMessage } = useIntl();
+  const [state, dispatch] = useReducer(reducer, initialFormState);
+  const { html, validationErrors, isSubmitting } = state;
 
-  // Manually register custom fields
-  React.useEffect(() => {
-    register('html', { required: true });
-  }, []);
+  useEffect(() => {
+    if (Object.keys(validationErrors).length === 0 && isSubmitting) {
+      submitForm({ html: html });
+    }
+  }, [validationErrors]);
 
-  // Called by react-hook-form when submitting the form
-  const submit = async values => {
-    const comment = prepareCommentParams(values, ConversationId, ExpenseId);
+  const validateSubmit = event => {
+    event.preventDefault();
+    dispatch({ field: 'validationErrors', value: validate(state) });
+    dispatch({ field: 'isSubmitting', value: true });
+  };
+
+  const submitForm = async htmlField => {
+    const comment = prepareCommentParams(htmlField, ConversationId, ExpenseId);
     const response = await createComment({ variables: { comment } });
     if (onSuccess) {
       return onSuccess(response.data.createComment);
@@ -112,7 +141,7 @@ const CommentForm = ({
           />
         </ContainerOverlay>
       )}
-      <form onSubmit={handleSubmit(submit)} data-cy="comment-form">
+      <form onSubmit={validateSubmit} data-cy="comment-form">
         {loadingLoggedInUser ? (
           <LoadingPlaceholder height={232} />
         ) : (
@@ -122,18 +151,22 @@ const CommentForm = ({
             editorMinHeight={150}
             placeholder={formatMessage(messages.placeholder)}
             autoFocus={isAutoFocused(id)}
-            disabled={isDisabled || !LoggedInUser || formState.isSubmitting}
+            disabled={isDisabled || !LoggedInUser}
             reset={get(data, 'createComment.id')}
             fontSize="13px"
-            onChange={e => {
-              setValue('html', e.target.value);
-              triggerValidation('html');
-            }}
+            onChange={e => dispatch({ field: 'html', value: e.target.value })}
           />
         )}
-        {error && (
+        {validationErrors.html && (
+          <P color="red.500" mt={3}>
+            {validationErrors.html.type === 'required' && (
+              <FormattedMessage id="Error.FieldRequired" defaultMessage="This field is required" />
+            )}
+          </P>
+        )}
+        {mutationError && (
           <MessageBox type="error" withIcon mt={2}>
-            {getErrorFromGraphqlException(error).message}
+            {getErrorFromGraphqlException(mutationError).message}
           </MessageBox>
         )}
         <StyledButton
@@ -141,8 +174,7 @@ const CommentForm = ({
           mt={3}
           minWidth={150}
           buttonStyle="primary"
-          disabled={isDisabled || !LoggedInUser || !formState.isValid}
-          loading={formState.isSubmitting}
+          disabled={isDisabled || !LoggedInUser}
           data-cy="submit-comment-btn"
         >
           {formatMessage(messages.postReply)}
